@@ -1,0 +1,16 @@
+^.*\.Rproj$
+^\.devcontainer$
+^\.dockerignore$
+^\.github$
+^\.Rproj\.user$
+^\.zzcollab-state$
+^\.zzcollab$
+^analysis$
+^CITATION\.cff$
+^Dockerfile$
+^docs$
+^LICENSE$
+^Makefile$
+^renv\.lock$
+^renv$
+^zzcollab\.yaml$

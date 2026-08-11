@@ -1,0 +1,26 @@
+Package: zzalloc
+Title: Treatment Allocation Schemes for Clinical Trials
+Version: 0.0.0.9000
+Authors@R:
+    person(given = "Ronald G.", family = "Thomas", email = "rgthomas@ucsd.edu", role = c("aut", "cre"))
+Description: A unified implementation of treatment allocation
+    procedures for randomized clinical trials, spanning unrestricted
+    randomization, restricted procedures that bound imbalance in the
+    total sample size, stratified designs, the covariate-adaptive
+    minimization family, and covariate-adjusted response-adaptive
+    designs. Every procedure shares one sequential interface and
+    returns assignments in arrival order, so that procedures can be
+    substituted for one another in simulation studies. Imbalance
+    diagnostics, including the response-weighted measure appropriate
+    when covariates differ in prognostic strength, are provided
+    alongside.
+License: GPL-3
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+Depends:
+    R (>= 4.1.0)
+Imports:
+    stats
+Suggests:
+    tinytest (>= 1.4.0)
+Config/roxygen2/version: 8.0.0
