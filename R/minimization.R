@@ -189,12 +189,14 @@ alloc_hu_hu <- function(covariates, p = 0.8, weights = NULL,
 #'
 #' Assigns by fair coin unless a covariate is *detectably*
 #' unbalanced, and only then biases the coin toward the deficient
-#' arm. Imbalance is judged by a test applied to each factor
-#' level, and the coin is tilted only when a test falls below
-#' `threshold`. Most allocations therefore remain purely random,
-#' which preserves unpredictability while still preventing the
-#' large imbalances that simple randomization occasionally
-#' produces.
+#' arm. Each covariate is tested for imbalance with a chi-square
+#' test on its arm-by-level table, and a covariate whose p-value
+#' falls below `threshold` casts a vote for whichever arm is
+#' deficient in the arriving subject's own level. The coin is
+#' tilted only when the votes are not tied. Most allocations
+#' therefore remain purely random, which preserves
+#' unpredictability while still preventing the large imbalances
+#' that simple randomization occasionally produces.
 #'
 #' This directly answers the predictability objection to
 #' minimization: rather than tilting the coin at every allocation
@@ -203,7 +205,8 @@ alloc_hu_hu <- function(covariates, p = 0.8, weights = NULL,
 #'
 #' @param covariates A data frame of discrete balancing factors.
 #' @param p Probability of the deficient arm when an imbalance is
-#'   flagged. Default 0.8.
+#'   flagged. Default 0.8; Zhao and colleagues report results for
+#'   0.65 to 0.70.
 #' @param threshold Significance level below which a level is
 #'   treated as imbalanced. Default 0.3, deliberately loose, since
 #'   the aim is to detect imbalance early rather than to control
@@ -242,19 +245,29 @@ alloc_msb <- function(covariates, p = 0.8, threshold = 0.3,
   for (i in seq_len(n)) {
     prob1 <- 0.5
     if (i > burn_in) {
-      # Vote across the subject's own levels: each flagged level
-      # pushes toward its own deficient arm, and the direction
-      # with more votes wins. A tie leaves the coin fair.
+      # One vote per covariate, not per level. Zhao and colleagues
+      # judge a covariate imbalanced with a chi-square test on its
+      # whole arm-by-level table, so a covariate is flagged by its
+      # overall distribution across arms. The direction of the vote
+      # is then set by the arriving subject's own level, since that
+      # is the only cell their assignment can move. A tie, or no
+      # flagged covariate, leaves the coin fair.
       votes <- 0L
       for (j in seq_len(k)) {
+        tbl <- counts[[j]]
+        seen <- colSums(tbl) > 0L
+        # A chi-square needs at least two occupied levels and both
+        # arms represented; before that the covariate cannot be
+        # called imbalanced and the subject is left to the coin.
+        if (sum(seen) < 2L) next
+        sub <- tbl[, seen, drop = FALSE]
+        if (any(rowSums(sub) == 0L)) next
+        pv <- suppressWarnings(stats::chisq.test(sub)$p.value)
+        if (is.na(pv) || pv >= threshold) next
         l <- lev[i, j]
-        n0 <- counts[[j]][1L, l]
-        n1 <- counts[[j]][2L, l]
-        tot <- n0 + n1
-        if (tot < 2L) next
-        # Two-sided binomial tail against an even split.
-        pv <- stats::binom.test(min(n0, n1), tot, 0.5)$p.value
-        if (pv < threshold) votes <- votes +
+        n0 <- tbl[1L, l]
+        n1 <- tbl[2L, l]
+        votes <- votes +
           if (n1 < n0) 1L else if (n1 > n0) -1L else 0L
       }
       if (votes > 0L) prob1 <- p

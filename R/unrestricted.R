@@ -61,19 +61,10 @@ alloc_random_allocation <- function(n) {
 #' @export
 alloc_permuted_block <- function(n, block_size = 4L) {
   n <- check_n(n)
-  if (!is.numeric(block_size) || !length(block_size) ||
-        anyNA(block_size)) {
-    stop("`block_size` must be a numeric vector without missing ",
-         "values.", call. = FALSE)
-  }
-  if (any(block_size < 2) || any(block_size %% 2 != 0)) {
-    stop("`block_size` entries must be even and at least 2.",
-         call. = FALSE)
-  }
+  block_size <- check_block_size(block_size)
   out <- integer(0)
   while (length(out) < n) {
-    b <- if (length(block_size) == 1L) block_size else
-      sample(block_size, 1L)
+    b <- draw_block(block_size)
     out <- c(out, sample(rep(c(0L, 1L), each = b / 2)))
   }
   out[seq_len(n)]

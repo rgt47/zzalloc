@@ -10,7 +10,8 @@ alloc_msb(covariates, p = 0.8, threshold = 0.3, burn_in = 20L)
 \item{covariates}{A data frame of discrete balancing factors.}
 
 \item{p}{Probability of the deficient arm when an imbalance is
-flagged. Default 0.8.}
+flagged. Default 0.8; Zhao and colleagues report results for
+0.65 to 0.70.}
 
 \item{threshold}{Significance level below which a level is
 treated as imbalanced. Default 0.3, deliberately loose, since
@@ -26,12 +27,14 @@ An integer vector with one assignment per row.
 \description{
 Assigns by fair coin unless a covariate is \emph{detectably}
 unbalanced, and only then biases the coin toward the deficient
-arm. Imbalance is judged by a test applied to each factor
-level, and the coin is tilted only when a test falls below
-\code{threshold}. Most allocations therefore remain purely random,
-which preserves unpredictability while still preventing the
-large imbalances that simple randomization occasionally
-produces.
+arm. Each covariate is tested for imbalance with a chi-square
+test on its arm-by-level table, and a covariate whose p-value
+falls below \code{threshold} casts a vote for whichever arm is
+deficient in the arriving subject's own level. The coin is
+tilted only when the votes are not tied. Most allocations
+therefore remain purely random, which preserves
+unpredictability while still preventing the large imbalances
+that simple randomization occasionally produces.
 }
 \details{
 This directly answers the predictability objection to

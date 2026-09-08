@@ -45,7 +45,11 @@ allocate <- function(scheme, n = NULL, covariates = NULL, ...) {
   }
   fn <- switch(scheme,
     simple = function(...) alloc_simple(n, ...),
-    random_allocation = function(...) alloc_random_allocation(n),
+    # `...` is forwarded even though this scheme takes no further
+    # arguments, so that a misspelled or inapplicable one raises
+    # the same "unused argument" error it would for every other
+    # scheme rather than being silently discarded.
+    random_allocation = function(...) alloc_random_allocation(n, ...),
     permuted_block = function(...) alloc_permuted_block(n, ...),
     efron = function(...) alloc_efron(n, ...),
     wei_urn = function(...) alloc_wei_urn(n, ...),

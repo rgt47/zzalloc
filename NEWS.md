@@ -33,6 +33,44 @@
   itself. The design then adapted on the wrong variable while
   appearing to run normally.
 
+* **`alloc_msb()` now flags a covariate the way Zhao and
+  colleagues do.** The published method tests each covariate for
+  imbalance with a chi-square test on its whole arm-by-level table,
+  so a covariate is judged by whether its distribution differs
+  between arms. The implementation instead ran a binomial test on
+  the arriving subject's own level, which is a different and more
+  targeted criterion: it controls the count difference within a
+  level rather than the distribution across arms. The direction of
+  each vote, set by the subject's own level, is unchanged.
+
+  This narrows the margin by which MSB beats simple randomization
+  on per-level counts, because that is no longer what it targets:
+  over 300 replicates with one binary covariate and n = 300, mean
+  maximum per-level imbalance is about 11.5 against 14.0 for simple
+  randomization, where the previous criterion gave 8.6. On the
+  scale MSB does target, the difference in covariate proportion
+  between arms, the two criteria are equivalent (0.032 against
+  0.049 for simple randomization). Allocations differ from earlier
+  versions.
+
+## Robustness
+
+* `alloc_stratified_block()` validates `block_size` before
+  allocating rather than when a stratum queue first refills, and
+  reports invalid input the same way `alloc_permuted_block()` does.
+  A non-numeric length previously surfaced as "non-numeric argument
+  to binary operator" and `NA` as "missing value where TRUE/FALSE
+  needed"; both now name the argument.
+
+* `allocate()` forwards `...` to `alloc_random_allocation()`, so an
+  inapplicable or misspelled argument raises the same "unused
+  argument" error it does for every other scheme instead of being
+  silently discarded.
+
+* `check_covariates()` distinguishes a non-data-frame from a data
+  frame with no columns. A matrix was previously refused for
+  "lacking at least one column", which it does not lack.
+
 ## Documentation
 
 * `alloc_pocock_simon()` and `alloc_hu_hu()` now record that with

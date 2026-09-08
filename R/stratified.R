@@ -24,6 +24,7 @@
 #' @export
 alloc_stratified_block <- function(covariates, block_size = 4L) {
   covariates <- check_covariates(covariates)
+  block_size <- check_block_size(block_size)
   n <- nrow(covariates)
   stratum <- interaction(covariates, drop = FALSE, sep = "|")
   out <- integer(n)
@@ -34,12 +35,7 @@ alloc_stratified_block <- function(covariates, block_size = 4L) {
   for (i in seq_len(n)) {
     s <- as.character(stratum[i])
     if (is.null(queues[[s]]) || !length(queues[[s]])) {
-      b <- if (length(block_size) == 1L) block_size else
-        sample(block_size, 1L)
-      if (b < 2 || b %% 2 != 0) {
-        stop("`block_size` entries must be even and at least 2.",
-             call. = FALSE)
-      }
+      b <- draw_block(block_size)
       queues[[s]] <- sample(rep(c(0L, 1L), each = b / 2))
     }
     out[i] <- queues[[s]][1L]

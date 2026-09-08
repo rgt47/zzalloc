@@ -281,3 +281,91 @@ set.seed(23); hh <- alloc_hu_hu(cv_m, p = 0.8, overall_weight = 0,
                                 stratum_weight = 0)
 expect_identical(ps, hh,
   info = "hu_hu reduces to pocock_simon when the extra weights vanish")
+
+# --- round two regressions ---------------------------------------
+
+# Block lengths are validated before any allocation happens, and
+# the two block-consuming procedures report the same way. The
+# stratified version used to check only when a stratum queue first
+# refilled, so a non-numeric length surfaced as "non-numeric
+# argument to binary operator".
+cv_b <- data.frame(g = rep(c("a", "b"), each = 6))
+for (bad in list(3, 0, -4, "four", NA)) {
+  expect_error(alloc_stratified_block(cv_b, block_size = bad),
+    "`block_size`",
+    info = "stratified blocks reject an invalid block length")
+  expect_error(alloc_permuted_block(8, block_size = bad),
+    "`block_size`",
+    info = "permuted blocks reject an invalid block length")
+}
+expect_true(is.integer(alloc_stratified_block(cv_b,
+                                              block_size = c(2, 4))),
+  info = "a vector of valid block lengths is still accepted")
+
+# Every scheme reached through allocate() must reject an argument
+# it does not take; random_allocation used to discard `...`.
+expect_error(allocate("random_allocation", n = 10, block_size = 4),
+  "unused argument",
+  info = "allocate() does not silently swallow inapplicable
+          arguments")
+
+# A matrix is not a data frame, and the message should say so
+# rather than claim the input has no columns, which a matrix
+# plainly has. Assert the absence of the misleading clause, since
+# the previous message also began "must be a data frame" and an
+# assertion on that prefix alone would pass either way.
+m_err <- tryCatch(alloc_pocock_simon(matrix(1:10, 5)),
+                  error = function(e) conditionMessage(e))
+expect_true(grepl("must be a data frame", m_err) &&
+              !grepl("column", m_err),
+  info = "a matrix is refused for not being a data frame, not for
+          lacking columns")
+expect_error(alloc_pocock_simon(data.frame()), "at least one column",
+  info = "an empty data frame is refused for lacking columns")
+
+# MSB flags a covariate with a chi-square test on its whole
+# arm-by-level table, following Zhao and colleagues. It must still
+# beat simple randomization and must leave the overall split alone.
+# The chi-square criterion targets the covariate DISTRIBUTION
+# across arms, not the count difference within each level, so it
+# improves on simple randomization by a smaller margin on
+# max_marginal than a per-level rule would. Measured over 300
+# replicates the means are about 11.5 against 14.0; at 30
+# replicates the comparison is noisy enough to flip, so use enough
+# of them to make the assertion mean something.
+set.seed(41)
+cv_m2 <- data.frame(sex = sample(c("F", "M"), 300, TRUE))
+i_msb2 <- mean(replicate(150,
+  allocation_imbalance(alloc_msb(cv_m2), cv_m2)$max_marginal))
+i_sr2 <- mean(replicate(150,
+  allocation_imbalance(alloc_simple(300), cv_m2)$max_marginal))
+expect_true(i_msb2 < i_sr2,
+  info = "MSB improves on simple randomization")
+# The distributional scale is the one MSB actually targets.
+prop_gap <- function(a) {
+  tb <- table(factor(a, levels = c(0, 1)), cv_m2$sex)
+  abs(tb[2, 1] / sum(tb[2, ]) - tb[1, 1] / sum(tb[1, ]))
+}
+set.seed(43)
+d_msb <- mean(replicate(150, prop_gap(alloc_msb(cv_m2))))
+d_sr <- mean(replicate(150, prop_gap(alloc_simple(300))))
+expect_true(d_msb < d_sr,
+  info = "MSB improves the covariate distribution across arms")
+expect_true(
+  abs(mean(replicate(40, mean(alloc_msb(cv_m2)))) - 0.5) < 0.03,
+  info = "MSB does not shift the overall allocation")
+
+# Smith's design must satisfy both documented boundary conditions:
+# rho = 0 is complete randomization, rho = 1 is Wei's urn at
+# alpha = 0.
+set.seed(42)
+expect_true(
+  abs(mean(replicate(600, mean(alloc_smith(30, rho = 0)))) - 0.5) < 0.02,
+  info = "Smith with rho = 0 is complete randomization")
+smith_p <- function(n0, n1) n0^1 / (n0^1 + n1^1)
+wei_p <- function(n0, n1, a, b) (a + b * n0) / (2 * a + b * (n0 + n1))
+for (nn3 in list(c(3, 5), c(10, 2), c(7, 7))) {
+  expect_equal(smith_p(nn3[1], nn3[2]),
+               wei_p(nn3[1], nn3[2], 1e-10, 1), tolerance = 1e-6,
+    info = "Smith rho = 1 matches Wei's urn with alpha -> 0")
+}

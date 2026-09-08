@@ -26,6 +26,39 @@ check_p <- function(p, nm = "p") {
   as.numeric(p)
 }
 
+#' Validate permissible block lengths
+#'
+#' Shared by the two procedures that consume blocks, so that an
+#' invalid length is reported the same way and before any
+#' allocation happens rather than when a queue first refills.
+#'
+#' @param block_size Even block length, or a vector of them.
+#' @return `block_size` as a numeric vector.
+#' @noRd
+check_block_size <- function(block_size) {
+  if (!is.numeric(block_size) || !length(block_size) ||
+        anyNA(block_size)) {
+    stop("`block_size` must be a numeric vector without missing ",
+         "values.", call. = FALSE)
+  }
+  if (any(block_size < 2) || any(block_size %% 2 != 0)) {
+    stop("`block_size` entries must be even and at least 2.",
+         call. = FALSE)
+  }
+  block_size
+}
+
+#' Draw a block length
+#'
+#' `sample()` on a length-one numeric would be read as
+#' `sample.int()`, so the single-length case is taken directly.
+#'
+#' @noRd
+draw_block <- function(block_size) {
+  if (length(block_size) == 1L) block_size else
+    sample(block_size, 1L)
+}
+
 #' Validate covariate data supplied to a covariate-adaptive scheme
 #'
 #' Allocation procedures in the minimization family balance the
@@ -38,9 +71,13 @@ check_p <- function(p, nm = "p") {
 #' @return The covariates as a data frame of factors.
 #' @noRd
 check_covariates <- function(covariates) {
-  if (!is.data.frame(covariates) || !ncol(covariates)) {
-    stop("`covariates` must be a data frame with at least one ",
-         "column.", call. = FALSE)
+  if (!is.data.frame(covariates)) {
+    stop("`covariates` must be a data frame, not a ",
+         class(covariates)[1L], ".", call. = FALSE)
+  }
+  if (!ncol(covariates)) {
+    stop("`covariates` must have at least one column.",
+         call. = FALSE)
   }
   if (!nrow(covariates)) {
     stop("`covariates` must have at least one row.", call. = FALSE)
