@@ -55,7 +55,7 @@ covariate-adaptive randomization alone.
 The implementation assumes responses are available before the
 next subject is randomized. That is a strong assumption and
 frequently false in practice, since outcomes are often observed
-long after enrolment; with delayed responses the procedure
+long after enrollment; with delayed responses the procedure
 behaves closer to its burn-in.
 }
 \examples{

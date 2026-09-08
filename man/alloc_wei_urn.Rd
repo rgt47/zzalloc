@@ -9,18 +9,18 @@ alloc_wei_urn(n, alpha = 1, beta = 1)
 \arguments{
 \item{n}{Number of subjects.}
 
-\item{alpha}{Initial number of balls of each colour.}
+\item{alpha}{Initial number of balls of each color.}
 
-\item{beta}{Balls of the opposite colour added after each draw.
+\item{beta}{Balls of the opposite color added after each draw.
 \code{beta = 0} gives simple randomization.}
 }
 \value{
 An integer vector of length \code{n}.
 }
 \description{
-An urn starts with \code{alpha} balls of each colour. For each
+An urn starts with \code{alpha} balls of each color. For each
 subject a ball is drawn and replaced, the corresponding arm is
-assigned, and \code{beta} balls of the \emph{opposite} colour are added.
+assigned, and \code{beta} balls of the \emph{opposite} color are added.
 The pull toward balance is therefore strong early, when the
 added balls are a large fraction of the urn, and weakens as the
 trial grows, so the procedure becomes progressively less

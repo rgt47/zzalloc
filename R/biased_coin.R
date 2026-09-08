@@ -36,9 +36,9 @@ alloc_efron <- function(n, p = 2 / 3) {
 
 #' Wei's urn design
 #'
-#' An urn starts with `alpha` balls of each colour. For each
+#' An urn starts with `alpha` balls of each color. For each
 #' subject a ball is drawn and replaced, the corresponding arm is
-#' assigned, and `beta` balls of the *opposite* colour are added.
+#' assigned, and `beta` balls of the *opposite* color are added.
 #' The pull toward balance is therefore strong early, when the
 #' added balls are a large fraction of the urn, and weakens as the
 #' trial grows, so the procedure becomes progressively less
@@ -46,8 +46,8 @@ alloc_efron <- function(n, p = 2 / 3) {
 #' predictability is constant.
 #'
 #' @param n Number of subjects.
-#' @param alpha Initial number of balls of each colour.
-#' @param beta Balls of the opposite colour added after each draw.
+#' @param alpha Initial number of balls of each color.
+#' @param beta Balls of the opposite color added after each draw.
 #'   `beta = 0` gives simple randomization.
 #' @return An integer vector of length `n`.
 #' @references Wei LJ (1977). A class of designs for sequential
@@ -69,7 +69,7 @@ alloc_wei_urn <- function(n, alpha = 1, beta = 1) {
   n1 <- 0L
   n0 <- 0L
   for (i in seq_len(n)) {
-    # Balls favouring arm 1 are the initial alpha plus beta for
+    # Balls favoring arm 1 are the initial alpha plus beta for
     # every subject already sent to arm 0.
     w1 <- alpha + beta * n0
     w0 <- alpha + beta * n1
