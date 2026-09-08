@@ -78,11 +78,30 @@ alloc_cara <- function(covariates, response_fn,
       if (s1 + s0 <= 0) 0.5 else s1 / (s1 + s0)
     }
   }
+  cov_names <- names(covariates)
+  # The working model is fitted on the covariates cbind-ed with
+  # the assignment and the response. A covariate already called
+  # `trt` or `resp` would produce a duplicated column name, and
+  # `$` would then resolve to the covariate rather than to the
+  # quantity meant: the model would silently be fitted without
+  # the treatment indicator, or with the response on both sides.
+  clash <- intersect(cov_names, c("trt", "resp"))
+  if (length(clash)) {
+    stop("`covariates` must not contain a column named ",
+         paste(sprintf("'%s'", clash), collapse = " or "),
+         "; those names are used for the assignment and the ",
+         "response when fitting the working model. Rename the ",
+         "column.", call. = FALSE)
+  }
+  if (!is.numeric(burn_in) || length(burn_in) != 1L ||
+        is.na(burn_in) || burn_in < 0) {
+    stop("`burn_in` must be a single non-negative number.",
+         call. = FALSE)
+  }
   n <- nrow(covariates)
   burn_in <- min(as.integer(burn_in), n)
   trt <- integer(n)
   resp <- numeric(n)
-  cov_names <- names(covariates)
   fml <- stats::as.formula(paste(
     "resp ~ trt +", paste(cov_names, collapse = " + ")))
 

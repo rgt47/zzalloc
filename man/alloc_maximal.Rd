@@ -7,7 +7,8 @@
 alloc_maximal(n, boundary = 2L)
 }
 \arguments{
-\item{n}{Number of subjects.}
+\item{n}{Number of subjects. Must be even, since the procedure
+is defined over sequences that finish in balance.}
 
 \item{boundary}{Maximum permitted absolute imbalance.}
 }
@@ -15,14 +16,21 @@ alloc_maximal(n, boundary = 2L)
 An integer vector of length \code{n}.
 }
 \description{
-Draws uniformly from the set of all assignment sequences whose
-running imbalance never exceeds \code{boundary}. Among procedures
-respecting that bound this is the most random one available, so
-it minimizes the selection bias that arises when an
-investigator can guess upcoming assignments. Berger and
-colleagues proposed it for exactly that reason.
+Draws uniformly from the set of assignment sequences that end
+in equal arm sizes and whose running imbalance never exceeds
+\code{boundary}. Among procedures respecting that bound this is the
+most random one available, so it minimizes the selection bias
+that arises when an investigator can guess upcoming
+assignments. Berger and colleagues proposed it for exactly that
+reason.
 }
 \details{
+Terminal balance is part of the definition, not an incidental
+property: the procedure is the maximally random alternative to
+the permuted block, which also forces equal arm sizes, and the
+comparison is only meaningful over the same reference set. \code{n}
+must therefore be even.
+
 The sequence is built one subject at a time, with the
 probability of each assignment proportional to the number of
 valid completions it leaves. Those counts are obtained by a

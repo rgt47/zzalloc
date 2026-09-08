@@ -26,7 +26,11 @@ positional. \code{NULL} gives equal weights.}
 
 \item{measure}{Imbalance measure applied within each factor
 level: \code{"sd"} (Pocock and Simon's own), \code{"diff"}, or
-\code{"squared"}.}
+\code{"squared"}. With two arms the first two give identical
+allocations, since the standard deviation of two counts is
+their absolute difference divided by \code{sqrt(2)} and the scale
+factor cancels in the comparison; \code{"squared"} is the only one
+that can order candidate assignments differently.}
 }
 \value{
 An integer vector with one assignment per row of

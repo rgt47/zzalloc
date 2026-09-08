@@ -54,11 +54,18 @@ for (b in c(1L, 2L, 5L)) {
 # sequences. The admissible set is enumerated here rather than
 # asserted, so the test cannot be satisfied by a wrong count that
 # happens to match a wrong implementation.
+#
+# Admissible means BOTH that the running imbalance stays within
+# the boundary and that the sequence ends in balance. Dropping the
+# second condition enumerates a strictly larger set (for n = 4,
+# b = 2 it is 10 sequences rather than 6) and the test would then
+# pass against an implementation that never balances.
 nn <- 4L
 bb <- 2L
 grid <- expand.grid(rep(list(c(0L, 1L)), nn))
 adm <- grid[apply(grid, 1, function(r)
-  max(abs(cumsum(2 * r - 1))) <= bb), , drop = FALSE]
+  max(abs(cumsum(2 * r - 1))) <= bb &&
+    sum(2 * r - 1) == 0), , drop = FALSE]
 n_adm <- nrow(adm)
 adm_keys <- apply(adm, 1, paste, collapse = "")
 
@@ -213,3 +220,64 @@ expect_error(allocate("simple"),
   info = "non-covariate schemes require n")
 expect_error(allocate("nonesuch", n = 10),
   info = "unknown scheme names are rejected")
+
+# --- regressions -------------------------------------------------
+
+# A factor of "0"/"1" passes an `%in%` membership test, because
+# that comparison is made on characters, but as.integer() on a
+# factor yields level codes. Decoding it that way silently turned
+# a balanced allocation into an imbalance of 3.
+f_trt <- factor(c(0, 1, 1, 0, 1, 0))
+i_trt <- c(0L, 1L, 1L, 0L, 1L, 0L)
+expect_equal(allocation_imbalance(f_trt)$overall,
+             allocation_imbalance(i_trt)$overall,
+             info = "factor and integer assignments agree")
+expect_equal(allocation_imbalance(f_trt)$overall, 0L,
+             info = "a balanced factor assignment reports 0")
+cv_f <- data.frame(x = c(0, 0, 1, 1, 0, 1))
+expect_equal(weighted_imbalance(f_trt, cv_f, beta = c(x = 1)),
+             weighted_imbalance(i_trt, cv_f, beta = c(x = 1)),
+             info = "weighted imbalance accepts a factor")
+
+# The maximal procedure is defined over sequences that finish in
+# balance, so every realization must, and an odd length has no
+# such sequence to draw from.
+set.seed(11)
+for (nn2 in c(6L, 10L, 20L)) {
+  expect_equal(sum(2 * alloc_maximal(nn2, boundary = 2) - 1), 0,
+               info = paste("maximal procedure ends balanced, n =",
+                            nn2))
+}
+expect_error(alloc_maximal(7, boundary = 2), "must be even",
+             info = "odd n is rejected")
+
+# A covariate named `trt` or `resp` collides with the columns the
+# working model needs; `$` then resolves to the covariate and the
+# treatment indicator silently drops out of the formula.
+rf_c <- function(trt, row) stats::rbinom(1, 1, 0.5)
+expect_error(
+  alloc_cara(data.frame(x = rnorm(10), trt = rnorm(10)), rf_c),
+  "must not contain a column named",
+  info = "a covariate named 'trt' is refused")
+expect_error(
+  alloc_cara(data.frame(x = rnorm(10), resp = rnorm(10)), rf_c),
+  "must not contain a column named",
+  info = "a covariate named 'resp' is refused")
+
+# With two arms the sd and diff measures differ only by a constant
+# factor, so they must produce identical allocations; squared is
+# the only measure that can reorder candidate assignments.
+set.seed(21)
+cv_m <- data.frame(sex = sample(c("F", "M"), 40, TRUE),
+                   stage = sample(c("I", "II", "III"), 40, TRUE))
+set.seed(22); m_sd <- alloc_pocock_simon(cv_m, measure = "sd")
+set.seed(22); m_df <- alloc_pocock_simon(cv_m, measure = "diff")
+expect_identical(m_sd, m_df,
+  info = "sd and diff agree for two arms")
+
+# Hu-Hu with both extra weights at zero is exactly Pocock-Simon.
+set.seed(23); ps <- alloc_pocock_simon(cv_m, p = 0.8)
+set.seed(23); hh <- alloc_hu_hu(cv_m, p = 0.8, overall_weight = 0,
+                                stratum_weight = 0)
+expect_identical(ps, hh,
+  info = "hu_hu reduces to pocock_simon when the extra weights vanish")

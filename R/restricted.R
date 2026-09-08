@@ -45,12 +45,19 @@ alloc_big_stick <- function(n, boundary = 3L) {
 
 #' Maximal procedure
 #'
-#' Draws uniformly from the set of all assignment sequences whose
-#' running imbalance never exceeds `boundary`. Among procedures
-#' respecting that bound this is the most random one available, so
-#' it minimizes the selection bias that arises when an
-#' investigator can guess upcoming assignments. Berger and
-#' colleagues proposed it for exactly that reason.
+#' Draws uniformly from the set of assignment sequences that end
+#' in equal arm sizes and whose running imbalance never exceeds
+#' `boundary`. Among procedures respecting that bound this is the
+#' most random one available, so it minimizes the selection bias
+#' that arises when an investigator can guess upcoming
+#' assignments. Berger and colleagues proposed it for exactly that
+#' reason.
+#'
+#' Terminal balance is part of the definition, not an incidental
+#' property: the procedure is the maximally random alternative to
+#' the permuted block, which also forces equal arm sizes, and the
+#' comparison is only meaningful over the same reference set. `n`
+#' must therefore be even.
 #'
 #' The sequence is built one subject at a time, with the
 #' probability of each assignment proportional to the number of
@@ -59,7 +66,8 @@ alloc_big_stick <- function(n, boundary = 3L) {
 #' imbalance), which is what makes the draw exactly uniform rather
 #' than merely bounded.
 #'
-#' @param n Number of subjects.
+#' @param n Number of subjects. Must be even, since the procedure
+#'   is defined over sequences that finish in balance.
 #' @param boundary Maximum permitted absolute imbalance.
 #' @return An integer vector of length `n`.
 #' @references Berger VW, Ivanova A, Knoll MD (2003). Minimizing
@@ -79,15 +87,24 @@ alloc_maximal <- function(n, boundary = 2L) {
     stop("`boundary` must be a single positive whole number.",
          call. = FALSE)
   }
+  if (n %% 2L != 0L) {
+    stop("`n` must be even; the maximal procedure draws from ",
+         "sequences that end with equal arm sizes, and no odd-",
+         "length sequence does.", call. = FALSE)
+  }
   boundary <- as.integer(boundary)
   states <- seq.int(-boundary, boundary)
   idx <- function(d) d + boundary + 1L
 
   # counts[k, ] holds, for each reachable imbalance, the number of
   # ways to allocate the remaining k subjects without ever leaving
-  # [-boundary, boundary]. Row 1 is "no subjects remaining".
+  # [-boundary, boundary] and finishing at imbalance 0. Row 1 is
+  # "no subjects remaining", so only the balanced state counts as
+  # a completed sequence; seeding the whole row with 1 would admit
+  # every terminal imbalance and sample a strictly larger set than
+  # the procedure is defined over.
   counts <- matrix(0, nrow = n + 1L, ncol = length(states))
-  counts[1L, ] <- 1
+  counts[1L, idx(0L)] <- 1
   for (k in seq_len(n)) {
     for (d in states) {
       tot <- 0

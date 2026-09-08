@@ -108,8 +108,12 @@ weighted_imbalance <- function(trt, covariates, beta) {
 
 #' @noRd
 check_trt <- function(trt) {
-  if (!length(trt) || anyNA(trt) ||
-        !all(trt %in% c(0L, 1L, 0, 1))) {
+  # A factor of "0"/"1" passes the membership test below, because
+  # `%in%` compares as character, but `as.integer()` on a factor
+  # returns level codes (1, 2) rather than the labels. Convert
+  # through character so the labels are what survive.
+  if (is.factor(trt)) trt <- as.character(trt)
+  if (!length(trt) || anyNA(trt) || !all(trt %in% c(0, 1))) {
     stop("`trt` must be a non-empty vector of 0s and 1s without ",
          "missing values.", call. = FALSE)
   }

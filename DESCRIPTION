@@ -1,6 +1,6 @@
 Package: zzalloc
 Title: Treatment Allocation Schemes for Clinical Trials
-Version: 0.1.0
+Version: 0.2.0
 Authors@R:
     person(given = "Ronald G.", family = "Thomas", email = "rgthomas@ucsd.edu",
            role = c("aut", "cre"),

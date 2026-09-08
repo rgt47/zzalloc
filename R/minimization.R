@@ -28,7 +28,11 @@
 #'   positional. `NULL` gives equal weights.
 #' @param measure Imbalance measure applied within each factor
 #'   level: `"sd"` (Pocock and Simon's own), `"diff"`, or
-#'   `"squared"`.
+#'   `"squared"`. With two arms the first two give identical
+#'   allocations, since the standard deviation of two counts is
+#'   their absolute difference divided by `sqrt(2)` and the scale
+#'   factor cancels in the comparison; `"squared"` is the only one
+#'   that can order candidate assignments differently.
 #' @return An integer vector with one assignment per row of
 #'   `covariates`.
 #' @references Pocock SJ, Simon R (1975). Sequential treatment
