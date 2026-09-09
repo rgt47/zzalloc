@@ -1,0 +1,143 @@
+---
+title: "Covariate-adaptive randomization"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Covariate-adaptive randomization}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+library(zzalloc)
+set.seed(20260908)
+cv <- data.frame(
+  sex = sample(c("F", "M"), 240, TRUE),
+  stage = sample(c("I", "II", "III"), 240, TRUE)
+)
+```
+
+The procedures here all look at the covariates of the arriving subject
+before assigning them. They differ in what they consider imbalanced and
+in how often they are willing to intervene.
+
+## Pocock-Simon minimization
+
+For each arriving subject the procedure computes what the imbalance
+would be under each assignment, summed over the levels that subject
+actually has, and assigns to the arm minimizing that total with
+probability `p`.
+
+```{r}
+a <- alloc_pocock_simon(cv, p = 0.8)
+allocation_imbalance(a, cv)$marginal
+```
+
+Only the subject's own levels enter the score. Levels they do not
+belong to are unaffected by where this subject goes, and would
+contribute the same constant to both hypothetical totals.
+
+`p` controls how hard the procedure pushes. At `p = 0.5` the score
+never influences the draw and the procedure is simple randomization; at
+`p = 1` it is deterministic minimization, which is Taves's original
+proposal and the most predictable member of the family.
+
+```{r}
+mean_imbalance <- function(p, reps = 40) {
+  mean(replicate(reps,
+    allocation_imbalance(alloc_pocock_simon(cv, p = p), cv)$max_marginal))
+}
+sapply(c(0.5, 0.7, 0.9, 1.0), mean_imbalance)
+```
+
+### The measure argument
+
+With two arms, `"sd"` and `"diff"` give identical allocations: the
+standard deviation of two counts is their absolute difference divided
+by the square root of two, and the constant cancels in the comparison.
+Only `"squared"` can order candidate assignments differently, because
+a tie in the sum of absolute differences is not a tie in the sum of
+squares: `1 + 3` equals `2 + 2`, but `1 + 9` does not equal `4 + 4`.
+
+```{r}
+set.seed(1); m_sd <- alloc_pocock_simon(cv, measure = "sd")
+set.seed(1); m_df <- alloc_pocock_simon(cv, measure = "diff")
+identical(m_sd, m_df)
+```
+
+## Hu-Hu joint balance
+
+Marginal balance can hide imbalance inside cells, which matters when
+the outcome depends on a covariate interaction. `alloc_hu_hu()` scores
+three things at once: overall imbalance, marginal imbalance, and
+imbalance within the subject's own joint stratum.
+
+```{r}
+worst_stratum <- function(a) max(abs(allocation_imbalance(a, cv)$stratum))
+c(pocock_simon = worst_stratum(alloc_pocock_simon(cv)),
+  hu_hu = worst_stratum(alloc_hu_hu(cv, stratum_weight = 2)))
+```
+
+Setting both extra weights to zero recovers Pocock-Simon exactly:
+
+```{r}
+set.seed(2); ps <- alloc_pocock_simon(cv, p = 0.8)
+set.seed(2); hh <- alloc_hu_hu(cv, p = 0.8, overall_weight = 0,
+                               stratum_weight = 0)
+identical(ps, hh)
+```
+
+## Minimal sufficient balance
+
+The objection to minimization is that it tilts the coin at every
+allocation, to prevent imbalances that mostly would not have occurred.
+Minimal sufficient balance intervenes only when an imbalance has
+actually appeared: each covariate is tested with a chi-square test on
+its arm-by-level table, and only a covariate whose p-value falls below
+`threshold` casts a vote.
+
+```{r}
+msb <- alloc_msb(cv, threshold = 0.3)
+mean(msb)  # overall allocation is left alone
+```
+
+Because it targets the covariate *distribution* across arms rather than
+the count difference within each level, it improves on simple
+randomization by a smaller margin on per-level counts than a per-level
+rule would, and by a similar margin on the distributional scale it
+actually targets.
+
+```{r}
+prop_gap <- function(a) {
+  tb <- table(factor(a, levels = c(0, 1)), cv$sex)
+  abs(tb[2, 1] / sum(tb[2, ]) - tb[1, 1] / sum(tb[1, ]))
+}
+c(msb = mean(replicate(40, prop_gap(alloc_msb(cv)))),
+  simple = mean(replicate(40, prop_gap(alloc_simple(nrow(cv))))))
+```
+
+## Response-adaptive allocation
+
+`alloc_cara()` is different in kind from everything above. Those
+procedures balance covariates and are agnostic to outcomes; this one
+deliberately induces imbalance *in response* to outcomes, sending
+subjects preferentially to the arm that is working better for people
+like them. The objective is ethical rather than statistical.
+
+```{r}
+set.seed(3)
+cvc <- data.frame(x = rnorm(150))
+rf <- function(trt, row) rbinom(1, 1, plogis(-0.2 + 1.5 * trt + 0.5 * row$x))
+out <- alloc_cara(cvc, rf, burn_in = 40)
+c(burn_in = mean(out$trt[1:40]), adapted = mean(out$trt[41:150]))
+```
+
+Two cautions. The assignment sequence depends on the responses, so
+standard tests require more care than under covariate-adaptive
+randomization alone. And the implementation assumes responses arrive
+before the next subject is randomized, which is frequently false:
+with delayed responses the procedure behaves closer to its burn-in.
+
+By default it draws fresh parameters per imputation, propagating
+estimation uncertainty. Setting `param_uncertainty = FALSE` conditions
+on the fitted model instead, which understates that uncertainty.

@@ -167,9 +167,21 @@ imbalance_of <- function(n0, n1, measure = c("diff", "sd",
 #' @param p Probability of taking the arm that minimizes imbalance.
 #' @noRd
 biased_draw <- function(score1, score0, p) {
-  if (score1 < score0) {
+  # Compare on a tolerance, not exactly. The scores are sums of
+  # floating-point terms, and two assignments that are mathematically
+  # tied need not produce bit-identical sums: sd(c(n0, n1)) and
+  # abs(n1 - n0) / sqrt(2) are equal in real arithmetic but differ in
+  # the last bits for 748 of the 1681 count pairs up to 40. An exact
+  # comparison therefore missed genuine ties and applied p, or 1 - p,
+  # on the strength of rounding error. With the default
+  # measure = "sd", 23 of 108 ties were missed over 400 subjects; with
+  # "squared", 31 of 113. Those subjects should have had a fair coin,
+  # which is the rule that makes these procedures reduce to simple
+  # randomization when the balancing criterion is uninformative.
+  tol <- 1e-9 * max(1, abs(score1), abs(score0))
+  if (score1 < score0 - tol) {
     prob1 <- p
-  } else if (score1 > score0) {
+  } else if (score1 > score0 + tol) {
     prob1 <- 1 - p
   } else {
     prob1 <- 0.5

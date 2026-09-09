@@ -369,3 +369,50 @@ for (nn3 in list(c(3, 5), c(10, 2), c(7, 7))) {
                wei_p(nn3[1], nn3[2], 1e-10, 1), tolerance = 1e-6,
     info = "Smith rho = 1 matches Wei's urn with alpha -> 0")
 }
+
+# --- tie handling (regression) ------------------------------------
+
+# The scores compared in biased_draw() are sums of floating-point
+# terms, and two assignments that are mathematically tied need not
+# produce bit-identical sums. sd(c(n0, n1)) and abs(n1 - n0)/sqrt(2)
+# are equal in real arithmetic but differ in the last bits for 748 of
+# the 1681 count pairs up to 40, so an exact comparison missed genuine
+# ties and applied p, or 1 - p, on the strength of rounding error.
+# Over 400 subjects with the default measure = "sd", 23 of 108 ties
+# were missed. Those subjects should have had a fair coin.
+expect_true(
+  sum(vapply(0:40, function(a) sum(vapply(0:40, function(b)
+    stats::sd(c(a, b)) != abs(b - a) / sqrt(2), logical(1))), integer(1))) > 0,
+  info = "sd and diff/sqrt(2) do differ in the last bits, which is the
+          hazard being guarded against")
+
+# A tie must be seen as a tie, so the draw is fair rather than biased.
+# p is deliberately irrelevant at a tie, which is the whole point: at
+# p = 1 a recognised tie still splits evenly, while a genuine
+# difference is taken with certainty.
+set.seed(4)
+fair <- mean(replicate(4000, zzalloc:::biased_draw(5, 5, 1)))
+expect_true(abs(fair - 0.5) < 0.03,
+  info = "an exact tie draws fairly even at p = 1")
+set.seed(4)
+near <- mean(replicate(4000, zzalloc:::biased_draw(5, 5 + 1e-13, 1)))
+expect_true(abs(near - 0.5) < 0.03,
+  info = "a tie broken only by rounding noise still draws fairly")
+# A real difference must still bite.
+expect_equal(zzalloc:::biased_draw(1, 5, 1), 1L,
+  info = "a genuinely smaller score for arm 1 is taken at p = 1")
+expect_equal(zzalloc:::biased_draw(5, 1, 1), 0L,
+  info = "a genuinely smaller score for arm 0 is taken at p = 1")
+
+# sd and diff are proportional, so with the tie rule fixed they must
+# agree exactly, not merely usually. This previously passed only at
+# particular seeds and sizes.
+set.seed(5)
+cv_t <- data.frame(sex = sample(c("F", "M"), 400, TRUE),
+                   stage = sample(c("I", "II", "III"), 400, TRUE))
+for (s in c(1, 2, 3)) {
+  set.seed(s); a_sd <- alloc_pocock_simon(cv_t, measure = "sd")
+  set.seed(s); a_df <- alloc_pocock_simon(cv_t, measure = "diff")
+  expect_identical(a_sd, a_df,
+    info = paste("sd and diff agree exactly at seed", s))
+}

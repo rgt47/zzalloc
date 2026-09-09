@@ -1,3 +1,42 @@
+# zzalloc 0.3.0
+
+## Correctness fixes
+
+* **Mathematically tied assignments were resolved by rounding error.**
+  `biased_draw()` compared the two candidate scores exactly. The scores
+  are sums of floating-point terms, and two assignments that are tied
+  in real arithmetic need not produce bit-identical sums:
+  `sd(c(n0, n1))` and `abs(n1 - n0) / sqrt(2)` are equal mathematically
+  but differ in the last bits for 748 of the 1681 count pairs up to 40.
+  An exact comparison therefore missed genuine ties and applied `p`, or
+  `1 - p`, on the strength of the noise.
+
+  Over 400 subjects with the default `measure = "sd"`, 23 of 108 ties
+  were missed; those subjects should have had a fair coin. The tie rule
+  is what makes these procedures reduce to simple randomization when
+  the balancing criterion is uninformative, so losing it is not
+  cosmetic. The comparison now uses a relative tolerance, and every tie
+  is recognised for all three measures.
+
+  A consequence worth stating: `measure = "sd"` and `measure = "diff"`
+  are proportional and so should give identical allocations, and now do
+  exactly. Before the fix they diverged at 6 of 240 subjects, which is
+  how this was found.
+
+## Vignettes
+
+* New `choosing-a-procedure`, on the balance-versus-predictability
+  trade, the restricted procedures, and when stratification beats
+  minimization. The crossover is shown rather than asserted: with six
+  cells and 200 subjects stratification balances the margins better,
+  and by four factors it is roughly twice as unbalanced as
+  minimization.
+* New `covariate-adaptive`, on the minimization family, joint balance,
+  minimal sufficient balance, and the response-adaptive design.
+
+Both report figures averaged over replicates where a single trial is
+too noisy to support the claim being made.
+
 # zzalloc 0.2.0
 
 ## Correctness fixes

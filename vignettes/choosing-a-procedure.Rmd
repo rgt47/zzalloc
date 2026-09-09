@@ -97,22 +97,38 @@ own partial block.
 **Minimization** balances the margins instead, which is what lets it
 handle many factors at once.
 
+Which is better depends entirely on how well populated the cells are,
+and it is worth seeing the crossover rather than taking either side's
+word for it. A single realization is far too noisy to compare these,
+so each figure below is a mean over 30 trials.
+
 ```{r}
-cv <- data.frame(
-  sex = sample(c("F", "M"), 200, TRUE),
-  stage = sample(c("I", "II", "III"), 200, TRUE),
-  site = sample(c("a", "b", "c", "d"), 200, TRUE)
+compare <- function(n, levels, reps = 30) {
+  cv <- as.data.frame(lapply(levels, function(k) sample(letters[1:k], n, TRUE)))
+  worst <- function(f) mean(replicate(reps,
+    allocation_imbalance(f(cv), cv)$max_marginal))
+  c(cells = prod(unlist(levels)),
+    stratified = worst(alloc_stratified_block),
+    minimization = worst(alloc_pocock_simon))
+}
+
+set.seed(11)
+rbind(
+  `2 factors, n=200` = compare(200, list(sex = 2, stage = 3)),
+  `3 factors, n=200` = compare(200, list(sex = 2, stage = 3, site = 4)),
+  `4 factors, n=120` = compare(120, list(sex = 2, stage = 3, site = 4, grade = 3))
 )
-
-worst_marginal <- function(a) allocation_imbalance(a, cv)$max_marginal
-
-c(simple = worst_marginal(alloc_simple(nrow(cv))),
-  stratified = worst_marginal(alloc_stratified_block(cv)),
-  minimization = worst_marginal(alloc_pocock_simon(cv)))
 ```
 
-With three factors and 24 cells, minimization holds the margins tighter
-than stratification does.
+With six cells and 200 subjects, stratification wins: it balances the
+joint distribution directly and the cells are full enough to do it.
+Add a third factor and the position reverses; add a fourth and
+stratification is roughly twice as unbalanced on the margins. The
+number of cells is the product of the numbers of levels, so it grows
+faster than any realistic sample size, and each sparse cell contributes
+its own partial block.
+
+Stratify when the cells are full. Minimize when they are not.
 
 ### Weighting factors that matter more
 
@@ -121,17 +137,26 @@ member of this family that can say so. A stratified design can include
 a factor or exclude it; it cannot weight it.
 
 ```{r}
-even <- alloc_pocock_simon(cv, weights = c(sex = 1, stage = 1, site = 1))
-tilted <- alloc_pocock_simon(cv, weights = c(sex = 1, stage = 8, site = 1))
+set.seed(7)
+cv <- data.frame(
+  sex = sample(c("F", "M"), 200, TRUE),
+  stage = sample(c("I", "II", "III"), 200, TRUE),
+  site = sample(c("a", "b", "c", "d"), 200, TRUE)
+)
 
-sapply(list(even = even, tilted = tilted), function(a) {
-  m <- allocation_imbalance(a, cv)$marginal
+gap <- function(w, reps = 60) rowMeans(replicate(reps, {
+  m <- allocation_imbalance(alloc_pocock_simon(cv, weights = w), cv)$marginal
   c(stage = max(abs(m$stage)), sex = max(abs(m$sex)))
-})
+}))
+
+cbind(even = gap(c(sex = 1, stage = 1, site = 1)),
+      tilted = gap(c(sex = 1, stage = 8, site = 1)))
 ```
 
 Up-weighting `stage` improves stage balance and costs sex balance. The
-weighting shifts effort; it does not add any.
+weighting shifts effort; it does not add any. Again this needs
+averaging to see: in any single trial the difference is swamped by
+noise.
 
 ## Judging the result on the scale that matters
 
