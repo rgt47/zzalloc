@@ -26,5 +26,8 @@ Depends:
 Imports:
     stats
 Suggests:
+    knitr,
+    rmarkdown,
     tinytest (>= 1.4.0)
+VignetteBuilder: knitr
 Config/roxygen2/version: 8.0.0

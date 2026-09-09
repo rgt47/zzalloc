@@ -1,0 +1,177 @@
+---
+title: "Choosing an allocation procedure"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Choosing an allocation procedure}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+library(zzalloc)
+set.seed(20260908)
+```
+
+Every procedure in this package answers the same question, one subject
+at a time: which arm does the next person go to? They differ in what
+they are willing to give up to get it. This vignette is about that
+trade.
+
+## The trade
+
+Two properties are in tension.
+
+**Balance.** Unequal arm sizes cost power, and an imbalance that falls
+along a prognostic covariate costs more than that, because it
+confounds the treatment effect with the covariate.
+
+**Unpredictability.** If an investigator can guess the next assignment,
+they can choose whom to enrol next, and selection bias enters a trial
+that was supposed to be randomized. This is not hypothetical: it is why
+allocation concealment is a standard item in risk-of-bias assessment.
+
+Nothing achieves both perfectly. Simple randomization is maximally
+unpredictable and does not bound imbalance at all; forcing exact
+balance makes the tail of every block deterministic.
+
+```{r}
+n <- 100
+imbalance_path <- function(x) cumsum(2 * x - 1)
+
+simple <- alloc_simple(n)
+blocked <- alloc_permuted_block(n, block_size = 4)
+
+c(simple = max(abs(imbalance_path(simple))),
+  blocked = max(abs(imbalance_path(blocked))))
+```
+
+Simple randomization wanders; the block design cannot exceed half a
+block. The cost is that in a block of four, once three assignments are
+known the fourth is determined.
+
+## Bounding imbalance without tilting every coin
+
+The biased-coin family tilts the coin at every step. Efron's design
+sends the next subject to the smaller arm with probability `p`:
+
+```{r}
+efron <- alloc_efron(n, p = 2 / 3)
+max(abs(imbalance_path(efron)))
+```
+
+The big stick does something different: it leaves the coin fair until
+the imbalance actually reaches a boundary, and only then forces the
+deficient arm. It pays for the bound only when the bound binds.
+
+```{r}
+stick <- alloc_big_stick(n, boundary = 3)
+max(abs(imbalance_path(stick)))
+```
+
+The maximal procedure goes further. Among all sequences that respect a
+boundary *and* finish in balance, it draws uniformly, which makes it
+the most random procedure subject to those constraints.
+
+```{r}
+mx <- alloc_maximal(20, boundary = 2)
+c(final_imbalance = sum(2 * mx - 1),
+  max_excursion = max(abs(imbalance_path(mx))))
+```
+
+Terminal balance is part of its definition, not an accident, so the
+sample size must be even.
+
+## Balancing covariates
+
+Bounding the total arm sizes says nothing about whether the arms are
+comparable on prognostic factors. Two approaches address that.
+
+**Stratification** runs a separate block sequence within each cell of
+the covariate cross-classification. It gives the strongest balance when
+the cells are well populated, and degrades when they are not: the
+number of cells is the product of the numbers of levels, so with a few
+factors most cells hold a handful of subjects and each contributes its
+own partial block.
+
+**Minimization** balances the margins instead, which is what lets it
+handle many factors at once.
+
+```{r}
+cv <- data.frame(
+  sex = sample(c("F", "M"), 200, TRUE),
+  stage = sample(c("I", "II", "III"), 200, TRUE),
+  site = sample(c("a", "b", "c", "d"), 200, TRUE)
+)
+
+worst_marginal <- function(a) allocation_imbalance(a, cv)$max_marginal
+
+c(simple = worst_marginal(alloc_simple(nrow(cv))),
+  stratified = worst_marginal(alloc_stratified_block(cv)),
+  minimization = worst_marginal(alloc_pocock_simon(cv)))
+```
+
+With three factors and 24 cells, minimization holds the margins tighter
+than stratification does.
+
+### Weighting factors that matter more
+
+Covariates are not equally prognostic, and minimization is the only
+member of this family that can say so. A stratified design can include
+a factor or exclude it; it cannot weight it.
+
+```{r}
+even <- alloc_pocock_simon(cv, weights = c(sex = 1, stage = 1, site = 1))
+tilted <- alloc_pocock_simon(cv, weights = c(sex = 1, stage = 8, site = 1))
+
+sapply(list(even = even, tilted = tilted), function(a) {
+  m <- allocation_imbalance(a, cv)$marginal
+  c(stage = max(abs(m$stage)), sex = max(abs(m$sex)))
+})
+```
+
+Up-weighting `stage` improves stage balance and costs sex balance. The
+weighting shifts effort; it does not add any.
+
+## Judging the result on the scale that matters
+
+Counting covariate imbalance treats every factor as equally important.
+It is not. `weighted_imbalance()` weights each covariate's imbalance by
+its association with the outcome, which is the scale on which an
+imbalance actually costs you something.
+
+```{r}
+cvn <- data.frame(
+  strong = sample(0:1, 200, TRUE),
+  weak = sample(0:1, 200, TRUE)
+)
+a <- alloc_simple(200)
+
+# 'strong' predicts the outcome five times as hard as 'weak'
+weighted_imbalance(a, cvn, beta = c(strong = 1.0, weak = 0.2))
+```
+
+A design can look well balanced on counts while being materially
+unbalanced on this measure, if the imbalance happens to land in the
+covariate that predicts the outcome. The converse also holds, which is
+the more comforting case.
+
+## One interface
+
+Every procedure is reachable through `allocate()`, so a simulation can
+iterate over procedures without a `switch` at each call site.
+
+```{r}
+allocation_schemes()
+```
+
+```{r}
+sapply(c("simple", "efron", "big_stick", "maximal"),
+       function(s) max(abs(imbalance_path(allocate(s, n = 40)))))
+```
+
+## Where to look next
+
+`vignette("covariate-adaptive")` covers the minimization family in
+more detail, including the joint-balance and minimal-sufficient-balance
+variants and the response-adaptive design.
