@@ -64,7 +64,10 @@ alloc_big_stick <- function(n, boundary = 3L) {
 #' valid completions it leaves. Those counts are obtained by a
 #' backward recursion over (subjects remaining, current
 #' imbalance), which is what makes the draw exactly uniform rather
-#' than merely bounded.
+#' than merely bounded. Each stage of the recursion is rescaled by
+#' a power of two, which leaves every transition probability
+#' unchanged while keeping the counts finite, so large `n` (tested
+#' to 10000) is supported.
 #'
 #' @param n Number of subjects. Must be even, since the procedure
 #'   is defined over sequences that finish in balance.
@@ -103,6 +106,14 @@ alloc_maximal <- function(n, boundary = 2L) {
   # a completed sequence; seeding the whole row with 1 would admit
   # every terminal imbalance and sample a strictly larger set than
   # the procedure is defined over.
+  #
+  # The raw counts grow geometrically in k and exceed the double
+  # range (about 2^1024) near n = 1200 for boundary 3, after which
+  # up / (up + down) is Inf / Inf. The draw only ever uses ratios
+  # within one row, so each row is rescaled as it is built. The
+  # scale is a power of two, which makes the division exact: every
+  # transition probability is bit-identical to the unscaled one
+  # wherever the unscaled counts were representable.
   counts <- matrix(0, nrow = n + 1L, ncol = length(states))
   counts[1L, idx(0L)] <- 1
   for (k in seq_len(n)) {
@@ -111,6 +122,10 @@ alloc_maximal <- function(n, boundary = 2L) {
       if (d + 1L <= boundary) tot <- tot + counts[k, idx(d + 1L)]
       if (d - 1L >= -boundary) tot <- tot + counts[k, idx(d - 1L)]
       counts[k + 1L, idx(d)] <- tot
+    }
+    row_max <- max(counts[k + 1L, ])
+    if (row_max > 0) {
+      counts[k + 1L, ] <- counts[k + 1L, ] / 2^floor(log2(row_max))
     }
   }
   if (counts[n + 1L, idx(0L)] == 0) {

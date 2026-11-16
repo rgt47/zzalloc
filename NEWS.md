@@ -1,3 +1,19 @@
+# zzalloc (development version)
+
+## Correctness fixes
+
+* **`alloc_maximal()` failed for large `n`.** The backward recursion
+  counts the valid completions from each state, and those counts grow
+  geometrically until they exceed the double-precision range. From
+  about n = 1200 with `boundary = 3`, and n = 1100 with
+  `boundary = 10`, the transition probability became `Inf / Inf` and
+  the call stopped with 'missing value where TRUE/FALSE needed'. Each
+  stage of the recursion is now rescaled by a power of two. The draw
+  uses only ratios within a stage and the rescaling is exact, so the
+  transition probabilities, and the sequences drawn under a given
+  seed, are identical wherever the old code worked; n = 10000 now runs
+  in well under a second.
+
 # zzalloc 0.3.0
 
 ## Correctness fixes

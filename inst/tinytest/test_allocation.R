@@ -251,6 +251,62 @@ for (nn2 in c(6L, 10L, 20L)) {
 expect_error(alloc_maximal(7, boundary = 2), "must be even",
              info = "odd n is rejected")
 
+# The completion counts behind the maximal procedure grow
+# geometrically and overflowed double precision near n = 1200
+# (boundary 3) and n = 1100 (boundary 10), turning the transition
+# probability into Inf / Inf and the draw into a raw
+# 'missing value where TRUE/FALSE needed' error.
+for (cfg in list(c(1200, 3), c(1100, 10), c(4000, 3))) {
+  set.seed(12)
+  x_big <- tryCatch(alloc_maximal(cfg[1], boundary = cfg[2]),
+                    error = function(e) NULL)
+  expect_false(is.null(x_big),
+    info = paste("maximal overflow: n =", cfg[1], "boundary =",
+                 cfg[2], "runs without error"))
+  d_big <- cumsum(2 * x_big - 1)
+  expect_equal(d_big[length(d_big)], 0,
+    info = paste("maximal overflow: n =", cfg[1], "ends balanced"))
+  expect_true(length(d_big) == cfg[1] && max(abs(d_big)) <= cfg[2],
+    info = paste("maximal overflow: n =", cfg[1],
+                 "respects the boundary"))
+}
+
+# Rescaling the counts must not change the sampling distribution.
+# An unscaled reference draw, valid where the raw counts are
+# representable, must reproduce the package draw exactly under the
+# same seed.
+maximal_reference <- function(n, b) {
+  states <- seq.int(-b, b)
+  cnt <- matrix(0, n + 1L, length(states))
+  cnt[1L, b + 1L] <- 1
+  for (k in seq_len(n)) {
+    for (j in seq_along(states)) {
+      above <- if (j < length(states)) cnt[k, j + 1L] else 0
+      below <- if (j > 1L) cnt[k, j - 1L] else 0
+      cnt[k + 1L, j] <- above + below
+    }
+  }
+  out <- integer(n)
+  j <- b + 1L
+  for (i in seq_len(n)) {
+    r <- n - i + 1L
+    up <- if (j < length(states)) cnt[r, j + 1L] else 0
+    down <- if (j > 1L) cnt[r, j - 1L] else 0
+    out[i] <- as.integer(stats::runif(1) < up / (up + down))
+    j <- j + if (out[i] == 1L) 1L else -1L
+  }
+  out
+}
+for (cfg in list(c(40, 2), c(200, 3), c(600, 10))) {
+  set.seed(13)
+  x_pkg <- alloc_maximal(cfg[1], boundary = cfg[2])
+  set.seed(13)
+  x_ref <- maximal_reference(cfg[1], cfg[2])
+  expect_identical(x_pkg, x_ref,
+    info = paste("maximal overflow fix leaves the draw unchanged, n =",
+                 cfg[1], "boundary =", cfg[2]))
+}
+
 # A covariate named `trt` or `resp` collides with the columns the
 # working model needs; `$` then resolves to the covariate and the
 # treatment indicator silently drops out of the formula.

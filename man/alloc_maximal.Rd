@@ -36,7 +36,10 @@ probability of each assignment proportional to the number of
 valid completions it leaves. Those counts are obtained by a
 backward recursion over (subjects remaining, current
 imbalance), which is what makes the draw exactly uniform rather
-than merely bounded.
+than merely bounded. Each stage of the recursion is rescaled by
+a power of two, which leaves every transition probability
+unchanged while keeping the counts finite, so large \code{n} (tested
+to 10000) is supported.
 }
 \examples{
 set.seed(1)
