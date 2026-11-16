@@ -11,7 +11,9 @@ covariate-adjusted response-adaptive designs.
 Every procedure shares one sequential interface and returns
 assignments in arrival order, so that procedures can be substituted
 for one another in simulation studies without a `switch` statement at
-each call site.
+each call site. The exception is `alloc_cara()` (and
+`allocate("cara", ...)`), which returns a list holding the assignment
+vector `trt` and the realized responses `response`.
 
 ## Installation
 
